@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cookie Heist</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #151527;
+        color: white;
+        font-family: "Courier New", monospace;
+        text-align: center;
+    }
+
+    h1 {
+        color: #ffd166;
+        text-shadow: 3px 3px black;
+        margin: 15px 0 5px;
+    }
+
+    #instructions {
+        font-size: 15px;
+        color: #eee;
+        margin-bottom: 8px;
+    }
+
+    #gameCanvas {
+        background: #222;
+        border: 6px solid #0b0b0b;
+        box-shadow: 0 0 25px black;
+        image-rendering: pixelated;
+    }
+
+    #message {
+        color: #ffd166;
+        font-size: 18px;
+        min-height: 28px;
+        margin-top: 10px;
+    }
+
+    button {
+        font-family: "Courier New", monospace;
+        background: #ffd166;
+        border: 4px solid #111;
+        padding: 10px 20px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>Cookie Heist</h1>
+
+<p id="instructions">
+    Move: Arrow Keys | Steal Cookie: SPACE | Calm Roomie: E | Hide behind sofa/table to lower noise
+</p>
+
+<canvas id="gameCanvas" width="950" height="560"></canvas>
+
+<p id="message">Steal cookies from the kitchen without waking your roomie.</p>
+<button onclick="restartGame()">Restart Game</button>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const msg = document.getElementById("message");
+
+let keys = {};
+let gameOver = false;
+
+let player = {
+    x: 70,
+    y: 455,
+    w: 34,
+    h: 52,
+    speed: 3.4
+};
+
+let roomie = {
+    x: 245,
+    y: 150,
+    sleep: 100,
+    stirTimer: 0
+};
+
+let cookies = 0;
+let totalCookies = 8;
+let time = 70;
+
+let cat = {
+    x: 650,
+    y: 120,
+    w: 55,
+    h: 35,
+    dx: 1.6
+};
+
+let phoneBuzz = false;
+let phoneTimer = 0;
+
+let stealMeter = 0;
+let stealing = false;
+
+document.addEventListener("keydown", e => {
+    keys[e.key] = true;
+    if (e.key.toLowerCase() === "e") calmRoomie();
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key] = false;
+    if (e.key === " ") {
+        stealing = false;
+        stealMeter = 0;
+    }
+});
+
+function rectsTouch(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+function near(x, y, w, h) {
+    return rectsTouch(player, {x, y, w, h});
+}
+
+function movePlayer() {
+    if (keys["ArrowUp"]) player.y -= player.speed;
+    if (keys["ArrowDown"]) player.y += player.speed;
+    if (keys["ArrowLeft"]) player.x -= player.speed;
+    if (keys["ArrowRight"]) player.x += player.speed;
+
+    player.x = Math.max(15, Math.min(canvas.width - player.w - 15, player.x));
+    player.y = Math.max(65, Math.min(canvas.height - player.h - 15, player.y));
+}
+
+function updateGame() {
+    if (gameOver) return;
+
+    movePlayer();
+
+    let noise = 0.03;
+
+    if (near(250, 140, 230, 135)) {
+        noise += 0.22;
+        msg.textContent = "Too close! Your roomie is mumbling in her sleep.";
+    }
+
+    if (near(130, 345, 70, 55)) {
+        noise += 0.5;
+        msg.textContent = "SQUEAK! You stepped on the dog toy.";
+    }
+
+    if (near(520, 390, 80, 55)) {
+        noise += 0.45;
+        msg.textContent = "CRUNCH! The chip bag is loud.";
+    }
+
+    if (near(cat.x, cat.y, cat.w, cat.h)) {
+        noise += 0.4;
+        msg.textContent = "The cat meowed. Betrayal.";
+    }
+
+    if (phoneBuzz && near(720, 370, 60, 40)) {
+        noise += 0.65;
+        msg.textContent = "The phone buzzed loudly!";
+    }
+
+    if (near(210, 160, 285, 150) || near(270, 360, 175, 75)) {
+        noise -= 0.08;
+    }
+
+    roomie.sleep -= noise;
+    roomie.sleep = Math.max(0, Math.min(100, roomie.sleep));
+
+    updateCat();
+    updatePhone();
+    stealCookie();
+
+    if (roomie.sleep <= 0) {
+        endGame("Your roomie woke up! You stole " + cookies + " cookies.");
+    }
+
+    if (cookies >= totalCookies) {
+        endGame("You stole all the cookies. Legendary snack thief.");
+    }
+}
+
+function stealCookie() {
+    let nearPlate = near(665, 235, 150, 100);
+
+    if (keys[" "] && nearPlate) {
+        stealing = true;
+        stealMeter += 1.4;
+        roomie.sleep -= 0.18;
+        msg.textContent = "Careful... stealing cookie...";
+
+        if (stealMeter >= 100) {
+            cookies++;
+            stealMeter = 0;
+            roomie.sleep -= 6;
+            msg.textContent = "Cookie stolen! The plate made a tiny clink.";
+        }
+    } else if (keys[" "] && !nearPlate) {
+        roomie.sleep -= 0.18;
+        msg.textContent = "You grabbed air. Suspicious.";
+    }
+}
+
+function calmRoomie() {
+    if (near(250, 140, 230, 135)) {
+        roomie.sleep += 12;
+        roomie.sleep = Math.min(100, roomie.sleep);
+        msg.textContent = "You whispered: 'Go back to sleep...' It worked.";
+    } else {
+        msg.textContent = "You need to be closer to your roomie to calm her.";
+    }
+}
+
+function updateCat() {
+    cat.x += cat.dx;
+    if (cat.x > 760 || cat.x < 590) cat.dx *= -1;
+}
+
+function updatePhone() {
+    phoneTimer++;
+
+    if (phoneTimer > 180) {
+        phoneBuzz = !phoneBuzz;
+        phoneTimer = 0;
+    }
+}
+
+function drawRoom() {
+    ctx.fillStyle = "#8b5e45";
+    ctx.fillRect(0, 60, 555, 500);
+
+    ctx.fillStyle = "#73966d";
+    ctx.fillRect(555, 60, 395, 500);
+
+    ctx.fillStyle = "#3b2c25";
+    ctx.fillRect(548, 60, 10, 500);
+
+    ctx.fillStyle = "#c97b46";
+    ctx.fillRect(70, 80, 90, 75);
+    ctx.fillStyle = "#9bd7f0";
+    ctx.fillRect(82, 92, 66, 50);
+
+    ctx.fillStyle = "#c97b46";
+    ctx.fillRect(790, 80, 90, 75);
+    ctx.fillStyle = "#9bd7f0";
+    ctx.fillRect(802, 92, 66, 50);
+
+    ctx.fillStyle = "#252525";
+    ctx.fillRect(40, 200, 125, 75);
+    ctx.fillStyle = "#90e0ef";
+    ctx.font = "14px Courier New";
+    ctx.fillText("TV: cooking show", 48, 242);
+
+    ctx.fillStyle = "#e76f51";
+    ctx.fillRect(230, 445, 270, 70);
+
+    ctx.fillStyle = "#9c6644";
+    ctx.fillRect(285, 370, 170, 75);
+
+    ctx.fillStyle = "#b5651d";
+    ctx.fillRect(690, 455, 220, 70);
+
+    ctx.fillStyle = "#d9f0ff";
+    ctx.fillRect(835, 220, 80, 140);
+
+    ctx.fillStyle = "#e9ecef";
+    ctx.beginPath();
+    ctx.ellipse(790, 490, 45, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawSofaAndRoomie() {
+    ctx.fillStyle = "#4b1d95";
+    roundRect(210, 210, 285, 95, 18);
+
+    ctx.fillStyle = "#e85d04";
+    ctx.beginPath();
+    ctx.ellipse(355, 185, 75, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#f2b6a0";
+    ctx.beginPath();
+    ctx.ellipse(355, 220, 65, 45, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffafcc";
+    roundRect(285, 242, 140, 48, 25);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(330, 218, 10, 4);
+    ctx.fillRect(370, 218, 10, 4);
+
+    ctx.fillStyle = "#caf0f8";
+    ctx.font = "24px Courier New";
+    ctx.fillText("Zzz...", 440, 190);
+}
+
+function drawPlayer() {
+    ctx.fillStyle = "#2b1d0e";
+    ctx.beginPath();
+    ctx.arc(player.x + 17, player.y + 10, 18, Math.PI, 0);
+    ctx.fill();
+
+    ctx.fillStyle = "#f4c2a1";
+    ctx.beginPath();
+    ctx.arc(player.x + 17, player.y + 18, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#00b4d8";
+    roundRect(player.x + 2, player.y + 34, 30, 36, 8);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(player.x + 10, player.y + 17, 4, 4);
+    ctx.fillRect(player.x + 21, player.y + 17, 4, 4);
+}
+
+function drawKitchenItems() {
+    ctx.fillStyle = "#fff8e8";
+    ctx.beginPath();
+    ctx.ellipse(735, 275, 70, 38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let i = 0; i < Math.max(0, totalCookies - cookies); i++) {
+        ctx.fillStyle = "#c77d35";
+        ctx.beginPath();
+        ctx.arc(700 + (i % 4) * 22, 270 + Math.floor(i / 4) * 22, 13, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#5c3215";
+        ctx.fillRect(696 + (i % 4) * 22, 267 + Math.floor(i / 4) * 22, 4, 4);
+    }
+
+    ctx.fillStyle = "#ffbe0b";
+    roundRect(520, 390, 80, 55, 5);
+    ctx.fillStyle = "#111";
+    ctx.font = "14px Courier New";
+    ctx.fillText("CHIPS", 537, 423);
+
+    ctx.fillStyle = "#ff006e";
+    roundRect(130, 345, 70, 55, 12);
+    ctx.fillStyle = "#111";
+    ctx.fillText("TOY", 150, 378);
+
+    ctx.fillStyle = phoneBuzz ? "#ff4d6d" : "#80ed99";
+    roundRect(720, 370, 60, 40, 5);
+    ctx.fillStyle = "#111";
+    ctx.fillText("PHONE", 727, 395);
+
+    ctx.fillStyle = "#f1faee";
+    ctx.beginPath();
+    ctx.ellipse(cat.x + 27, cat.y + 17, 35, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#111";
+    ctx.fillText("cat", cat.x + 16, cat.y + 24);
+}
+
+function drawHUD() {
+    ctx.fillStyle = "#151527";
+    ctx.fillRect(0, 0, canvas.width, 60);
+
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "18px Courier New";
+    ctx.fillText("Cookies: " + cookies + "/" + totalCookies, 35, 36);
+    ctx.fillText("Roomie Sleep: " + Math.floor(roomie.sleep) + "%", 345, 36);
+    ctx.fillText("Time: " + time, 780, 36);
+
+    ctx.fillStyle = "#333";
+    ctx.fillRect(345, 43, 220, 10);
+
+    ctx.fillStyle = roomie.sleep > 50 ? "#80ed99" : roomie.sleep > 25 ? "#ffbe0b" : "#ff4d6d";
+    ctx.fillRect(345, 43, roomie.sleep * 2.2, 10);
+
+    if (stealing) {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(650, 210, 180, 20);
+        ctx.fillStyle = "#ffd166";
+        ctx.fillRect(655, 215, stealMeter * 1.7, 10);
+        ctx.fillText("stealing...", 680, 200);
+    }
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawRoom();
+    drawSofaAndRoomie();
+    drawKitchenItems();
+    drawPlayer();
+    drawHUD();
+
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "34px Courier New";
+        ctx.fillText("GAME OVER", 365, 260);
+    }
+}
+
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+}
+
+function endGame(text) {
+    gameOver = true;
+    msg.textContent = text;
+}
+
+function restartGame() {
+    player.x = 70;
+    player.y = 455;
+    roomie.sleep = 100;
+    cookies = 0;
+    time = 70;
+    gameOver = false;
+    stealMeter = 0;
+    stealing = false;
+    msg.textContent = "Steal cookies from the kitchen without waking your roomie.";
+}
+
+setInterval(() => {
+    if (!gameOver) {
+        time--;
+        if (time <= 0) {
+            endGame("Time is up! You stole " + cookies + " cookies.");
+        }
+    }
+}, 1000);
+
+function loop() {
+    updateGame();
+    drawGame();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
