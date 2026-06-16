@@ -1,0 +1,116 @@
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #111111;
+    color: #f5f5f5;
+}
+
+.hero {
+    min-height: 90vh;
+    background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.85)), url("../assets/f1_celebration_todos.jpg");
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+nav {
+    text-align: right;
+    padding: 30px 70px;
+}
+
+nav a {
+    color: #ffffff;
+    text-decoration: none;
+    margin-left: 30px;
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+.hero-text {
+    text-align: center;
+    padding-top: 190px;
+}
+
+.hero-text h1 {
+    font-size: 64px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+}
+
+.hero-text p {
+    font-size: 22px;
+    color: #dddddd;
+}
+
+.button {
+    display: inline-block;
+    margin-top: 25px;
+    padding: 14px 28px;
+    background-color: #b30000;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.intro,
+.content-box,
+.video-section,
+.tableau-section {
+    width: 80%;
+    margin: 60px auto;
+    padding: 35px;
+    background-color: #1c1c1c;
+    border-radius: 10px;
+}
+
+h2 {
+    color: #ffffff;
+    font-size: 32px;
+}
+
+p,
+li {
+    color: #dddddd;
+    line-height: 1.7;
+    font-size: 18px;
+}
+
+.image-grid {
+    width: 80%;
+    margin: 60px auto;
+    display: flex;
+    gap: 20px;
+}
+
+.image-grid img {
+    width: 33%;
+    height: 260px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.video-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+}
+
+.video-container iframe {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+}
+
+footer {
+    text-align: center;
+    padding: 40px;
+    background-color: #000000;
+}
+
+footer a {
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 18px;
+}
