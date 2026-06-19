@@ -36,11 +36,15 @@ nav a {
     letter-spacing: 4px;
     text-transform: uppercase;
     margin-bottom: 20px;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+    color: #ffffff;
 }
 
 .hero-text p {
     font-size: 22px;
-    color: #dddddd;
+    color: #f7c948;
+    font-family: Georgia, serif;
+    font-style: italic;
 }
 
 .button {
@@ -65,7 +69,8 @@ nav a {
 }
 
 h2 {
-    color: #ffffff;
+    font-family: Georgia, serif;
+    color: #ff3b3b;
     font-size: 32px;
 }
 
@@ -113,4 +118,48 @@ footer a {
     color: #ffffff;
     text-decoration: none;
     font-size: 18px;
+}
+.app-link {
+    text-align: center;
+    padding: 40px;
+}
+
+.app-link a {
+    background-color: #ff6b35;
+    color: white;
+    padding: 12px 25px;
+    text-decoration: none;
+    border-radius: 8px;
+}
+.content-box h2 {
+    color: #f7c948;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+}
+
+.content-box ol {
+    font-family: Verdana, sans-serif;
+}
+
+.content-box ul li {
+    color: #b8d8ff;
+}
+
+.video-section h2 {
+    color: #ff3b3b;
+    font-family: Georgia, serif;
+}
+
+.tableau-section h2 {
+    color: #f7c948;
+    font-family: "Trebuchet MS", Arial, sans-serif;
+}
+
+.tableau-section p {
+    color: #dddddd;
+    font-family: Verdana, sans-serif;
+}
+
+footer a {
+    color: #ff3b3b;
+    font-family: Georgia, serif;
 }
