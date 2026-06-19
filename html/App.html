@@ -2,450 +2,823 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cookie Heist</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COOKIE SIEGE: THE ROOMMATE BATTLE</title>
 <style>
-    body {
-        margin: 0;
-        background: #151527;
-        color: white;
-        font-family: "Courier New", monospace;
-        text-align: center;
-    }
-
-    h1 {
-        color: #ffd166;
-        text-shadow: 3px 3px black;
-        margin: 15px 0 5px;
-    }
-
-    #instructions {
-        font-size: 15px;
-        color: #eee;
-        margin-bottom: 8px;
-    }
-
-    #gameCanvas {
-        background: #222;
-        border: 6px solid #0b0b0b;
-        box-shadow: 0 0 25px black;
-        image-rendering: pixelated;
-    }
-
-    #message {
-        color: #ffd166;
-        font-size: 18px;
-        min-height: 28px;
-        margin-top: 10px;
-    }
-
-    button {
-        font-family: "Courier New", monospace;
-        background: #ffd166;
-        border: 4px solid #111;
-        padding: 10px 20px;
-        font-weight: bold;
-        cursor: pointer;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background:#1a0a00; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'Press Start 2P',monospace,sans-serif; overflow:hidden; }
+  #gameContainer { position:relative; image-rendering:pixelated; }
+  canvas { display:block; image-rendering:pixelated; border:4px solid #ff8800; box-shadow:0 0 30px #ff4400,0 0 60px #aa2200; }
+  #overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(10,4,0,0.93); z-index:10; color:#ffcc44; }
+  #overlay h1 { font-size:17px; text-align:center; line-height:2; text-shadow:3px 3px #aa4400; margin-bottom:14px; color:#ffdd66; }
+  #overlay h2 { font-size:10px; color:#ff8844; text-align:center; line-height:2.2; margin-bottom:16px; }
+  #overlay p  { font-size:7px; color:#ffcc88; text-align:center; line-height:2.4; max-width:460px; margin-bottom:8px; }
+  .btn { margin-top:12px; padding:10px 22px; background:#cc4400; color:#ffdd88; border:3px solid #ff8800; font-family:'Press Start 2P',monospace; font-size:8px; cursor:pointer; transition:background 0.1s; }
+  .btn:hover { background:#ff6600; }
+  .cookieAnim { font-size:28px; animation:spin 2s linear infinite; margin-bottom:10px; }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  #floatTexts { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5; overflow:hidden; }
+  .floatText { position:absolute; font-family:'Press Start 2P',monospace; font-size:8px; color:#ff4444; text-shadow:1px 1px #000; animation:floatUp 1.2s forwards; white-space:nowrap; }
+  @keyframes floatUp { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-60px)} }
+.back-link {
+    position: fixed;
+    top: 40px;
+    right: 80px;
+    color: white;
+    text-decoration: none;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    z-index: 9999;
+}
 </style>
 </head>
-
 <body>
-
-<h1>Cookie Heist</h1>
-
-<p id="instructions">
-    Move: Arrow Keys | Steal Cookie: SPACE | Calm Roomie: E | Hide behind sofa/table to lower noise
-</p>
-
-<canvas id="gameCanvas" width="950" height="560"></canvas>
-
-<p id="message">Steal cookies from the kitchen without waking your roomie.</p>
-<button onclick="restartGame()">Restart Game</button>
-
+<a href="../index.html" class="back-link">Back to Formula 1</a>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="540" height="600"></canvas>
+  <div id="floatTexts"></div>
+  <div id="overlay">
+    <div class="cookieAnim">🍪</div>
+    <h1>COOKIE SIEGE<br>THE ROOMMATE BATTLE</h1>
+    <h2 id="overlaySubtitle">Your roommate baked cookies.<br>You want them. She will NOT share.</h2>
+    <p id="overlayBody">Climb the kitchen mountain and TOUCH THE COOKIES!<br><br>
+      ← → / A D — Move &nbsp;&nbsp; ↑ / W / Space — Jump<br>
+      ↓ / S — Crouch (dodge the ramen!)<br><br>
+      When you reach the top: crouch to dodge ramen,<br>
+      then touch the cookies to WIN!<br><br>
+      <span style="color:#ff8844;font-size:6px">Based on a true story.</span></p>
+    <button class="btn" id="overlayBtn">START GAME</button>
+    <button class="btn" id="instructBtn" style="margin-top:8px;font-size:7px;">HOW TO PLAY</button>
+  </div>
+</div>
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const msg = document.getElementById("message");
+// ============================================================
+//  COOKIE SIEGE v3
+//  Fixes: platform gaps jumpable, ALL platforms have obstacles,
+//         cookie jar decoration removed, crouch+ramen system
+// ============================================================
 
-let keys = {};
-let gameOver = false;
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+const overlay       = document.getElementById('overlay');
+const overlaySubtitle = document.getElementById('overlaySubtitle');
+const overlayBody   = document.getElementById('overlayBody');
+const overlayBtn    = document.getElementById('overlayBtn');
+const instructBtn   = document.getElementById('instructBtn');
+const floatTextsDiv = document.getElementById('floatTexts');
+const W = canvas.width, H = canvas.height;
 
-let player = {
-    x: 70,
-    y: 455,
-    w: 34,
-    h: 52,
-    speed: 3.4
-};
+// ── AUDIO ────────────────────────────────────────────────────
+const AC = new (window.AudioContext||window.webkitAudioContext)();
+function beep(freq,type,dur,vol=0.3,when=0){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.connect(g);g.connect(AC.destination);
+  o.type=type;o.frequency.setValueAtTime(freq,AC.currentTime+when);
+  g.gain.setValueAtTime(vol,AC.currentTime+when);
+  g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+when+dur);
+  o.start(AC.currentTime+when);o.stop(AC.currentTime+when+dur+0.05);
+}
+function sfxJump() { beep(300,'square',0.05);beep(600,'square',0.05,0.2,0.05); }
+function sfxHit()  { beep(180,'sawtooth',0.08,0.4);beep(120,'sawtooth',0.08,0.3,0.06); }
+function sfxWin()  { [523,659,784,1047].forEach((f,i)=>beep(f,'square',0.15,0.25,i*0.12)); }
+function sfxLose() { [400,300,200,100].forEach((f,i)=>beep(f,'sawtooth',0.15,0.3,i*0.1)); }
+function sfxCoin() { beep(880,'square',0.05,0.2);beep(1100,'square',0.05,0.2,0.06); }
 
-let roomie = {
-    x: 245,
-    y: 150,
-    sleep: 100,
-    stirTimer: 0
-};
+// ── LEVEL DEFINITIONS ────────────────────────────────────────
+//
+//  JUMP MATH: vy=-11, gravity=0.55 → max height = 11²/(2×0.55) ≈ 110px
+//  Player h=28, so usable gap (platform-top to platform-top) ≤ 110px
+//  We use 100px gaps consistently.  Last gap (penúltima→top) = 100px ✓
+//
+//  Each level lists platforms bottom→top.
+//  Index 0 = ground, last index = top platform (roommate lives here).
+//  EVERY platform except ground and top gets at least one obstacle
+//  via spawnObstacles() which assigns one obs per mid-platform guaranteed.
+//
+// ── JUMP MATH ─────────────────────────────────────────────────
+//  vy=-11, gravity=0.55 → max height ≈ 110px (11²/2/0.55)
+//  Gap between platforms (penúltima.y - top.y) = 100px → jumpable ✓
+//
+//  TOP PLATFORM RULE: always starts at x=80, w=200 (left side).
+//  PENÚLTIMA RULE:   always on the RIGHT side, short (w≤160),
+//                    leaving a clear LEFT gap ≥120px to jump up.
+//  This guarantees you can stand on penúltima's LEFT edge and
+//  jump straight up into the open space left of the top platform.
+//
+//  OPEN JUMP ZONE (all levels): x=0..200 at y=penúltima is CLEAR
+//  above it, because topPlat only covers x=80..280. So you jump
+//  from x≥300 (right side penúltima) into the open left zone is
+//  NOT needed — instead: penúltima is LEFT-SIDE short, top plat
+//  is RIGHT-SIDE. That way standing on penúltima right edge lets
+//  you jump to top.
+//
+//  FINAL DESIGN:
+//   penúltima: x=50, w=160  → covers x=50..210
+//   top plat:  x=200, w=300 → covers x=200..500, gap at RIGHT for jumpers
+//   Jump from penúltima right edge (x≈210) → land on top (x=200) ✓
+//   OR: penúltima right=320, top left=300, overlap just 20px edge — fine.
+//
+//  SIMPLEST SAFE LAYOUT per level:
+//   penúltima: LEFT-SIDE   x=30..190  (w=160)
+//   top:       RIGHT-SIDE  x=180..480 (w=300) with roommate+cookies there
+//   Clear jump: stand anywhere on penúltima, jump right → land on top ✓
 
-let cookies = 0;
-let totalCookies = 8;
-let time = 70;
+const LEVEL_DEFS = [
+  // ── LEVEL 1 ── speed 1.2
+  { speed:1.2,
+    platforms:[
+      {x:0,   y:555, w:540, h:20},  // ground
+      {x:50,  y:460, w:160, h:16},  // row1 left
+      {x:310, y:460, w:160, h:16},  // row1 right
+      {x:140, y:365, w:240, h:16},  // row2 centre
+      {x:30,  y:270, w:160, h:16},  // row3 left
+      {x:310, y:270, w:160, h:16},  // row3 right
+      {x:30,  y:175, w:110, h:16, noObs:true},  // penúltima — short, no obstacle, RIGHT gap clear
+      {x:190, y:75,  w:310, h:16},  // TOP — starts at x=190, roommate+cookies here
+    ], roommateY:35 },
 
-let cat = {
-    x: 650,
-    y: 120,
-    w: 55,
-    h: 35,
-    dx: 1.6
-};
+  // ── LEVEL 2 ── speed 1.8
+  { speed:1.8,
+    platforms:[
+      {x:0,   y:555, w:540, h:20},
+      {x:60,  y:460, w:150, h:16},
+      {x:320, y:460, w:150, h:16},
+      {x:150, y:365, w:220, h:16},
+      {x:30,  y:270, w:150, h:16},
+      {x:320, y:270, w:150, h:16},
+      {x:350, y:175, w:110, h:16, noObs:true},  // penúltima — short, no obstacle
+      {x:60,  y:75,  w:310, h:16},  // TOP — starts at x=60
+    ], roommateY:35 },
 
-let phoneBuzz = false;
-let phoneTimer = 0;
+  // ── LEVEL 3 ── speed 2.3
+  { speed:2.3,
+    platforms:[
+      {x:0,   y:555, w:540, h:20},
+      {x:80,  y:462, w:130, h:16},
+      {x:320, y:462, w:130, h:16},
+      {x:40,  y:375, w:120, h:16},
+      {x:370, y:375, w:120, h:16},
+      {x:175, y:288, w:180, h:16},
+      {x:40,  y:200, w:120, h:16},
+      {x:370, y:200, w:120, h:16},
+      {x:30,  y:112, w:110, h:16, noObs:true},  // penúltima — short, no obstacle
+      {x:185, y:12,  w:320, h:16},  // TOP
+    ], roommateY:-28 },
 
-let stealMeter = 0;
-let stealing = false;
+  // ── LEVEL 4 ── speed 2.9
+  { speed:2.9,
+    platforms:[
+      {x:0,   y:555, w:540, h:20},
+      {x:100, y:462, w:110, h:16},
+      {x:320, y:462, w:110, h:16},
+      {x:40,  y:375, w:100, h:16},
+      {x:390, y:375, w:100, h:16},
+      {x:195, y:288, w:140, h:16},
+      {x:40,  y:200, w:110, h:16},
+      {x:380, y:200, w:110, h:16},
+      {x:355, y:112, w:110, h:16, noObs:true},  // penúltima — short, no obstacle
+      {x:55,  y:12,  w:310, h:16},  // TOP
+    ], roommateY:-28 },
 
-document.addEventListener("keydown", e => {
-    keys[e.key] = true;
-    if (e.key.toLowerCase() === "e") calmRoomie();
+  // ── LEVEL 5 ── speed 3.5
+  { speed:3.5,
+    platforms:[
+      {x:0,   y:555, w:540, h:20},
+      {x:130, y:462, w:95,  h:16},
+      {x:315, y:462, w:95,  h:16},
+      {x:40,  y:377, w:85,  h:16},
+      {x:415, y:377, w:85,  h:16},
+      {x:210, y:292, w:115, h:16},
+      {x:40,  y:207, w:100, h:16},
+      {x:400, y:207, w:100, h:16},
+      {x:30,  y:117, w:110, h:16, noObs:true},  // penúltima — short, no obstacle
+      {x:180, y:17,  w:320, h:16},  // TOP
+    ], roommateY:-23 },
+];
+
+// Obstacle types – all are platform-walkers
+const OBS = [
+  {name:'Espátula',   w:28,h:10,dmg:10,color:'#cc8844',spd:1.0,shape:'spatula'},
+  {name:'Batidor',    w:18,h:26,dmg:15,color:'#aaaaaa',spd:1.2,shape:'whisk'},
+  {name:'Rodillo',    w:44,h:12,dmg:20,color:'#e8c080',spd:0.9,shape:'rollingpin'},
+  {name:'Sartén',     w:36,h:18,dmg:25,color:'#555555',spd:0.8,shape:'pan'},
+  {name:'Bandeja',    w:50,h:10,dmg:12,color:'#bb7744',spd:1.1,shape:'tray'},
+  {name:'Harina',     w:22,h:28,dmg:10,color:'#e8e0c8',spd:0.85,shape:'flour'},
+];
+
+// ── GAME STATE ───────────────────────────────────────────────
+let state='title', level=0, score=0, energy=100;
+let player,platforms,obstacles,roommate,cookies;
+let ramenProjectiles=[], ramenTimer=0;
+let particles=[], bgStars=[];
+let invincible=0, cookieTouchAnim=0;
+
+// ── PLAYER ───────────────────────────────────────────────────
+function makePlayer(){
+  return {x:240,y:510,w:22,h:28,vx:0,vy:0,onGround:false,facing:1,
+          walkFrame:0,walkTimer:0,knockback:0,slowTimer:0,crouching:false};
+}
+
+// ── INIT LEVEL ───────────────────────────────────────────────
+function initLevel(){
+  const def=LEVEL_DEFS[level];
+  platforms=def.platforms.map(p=>({...p}));
+  player=makePlayer();
+  energy=Math.max(energy,0);
+  obstacles=[];
+  spawnObstacles();
+
+  const top=platforms[platforms.length-1];
+  // Roommate stands on the left portion of top platform
+  roommate={
+    x:top.x+40, y:top.y-40,
+    w:30,h:38,frame:0,frameTimer:0,bounceY:0,throwAnim:0
+  };
+  // Cookies to the right of roommate, still on top platform
+  cookies={
+    x:top.x+top.w-80, y:top.y-26,
+    w:30,h:20,
+  };
+
+  ramenProjectiles=[];
+  ramenTimer=150;
+  particles=[];
+  cookieTouchAnim=0;
+  bgStars=Array.from({length:30},()=>({
+    x:Math.random()*W,y:Math.random()*H,
+    r:Math.random()*2+1,b:Math.random()
+  }));
+}
+
+// spawnObstacles: every mid-platform gets 2 obstacles (opposite directions)
+function spawnObstacles(){
+  const def=LEVEL_DEFS[level];
+  obstacles=[];
+  const midPlats=platforms.slice(1,platforms.length-1);
+
+  midPlats.forEach((plat,pi)=>{
+    if(plat.noObs) return; // penúltima — no obstacle
+    // Exactly 1 obstacle per platform
+    const count = 1;
+    for(let k=0;k<count;k++){
+      const useFlour = (pi%3===1) && k===0;
+      const typeIdx  = useFlour ? 5 : ((pi*2+k)%5);
+      const type     = OBS[typeIdx];
+      const dir      = k%2===0 ? 1 : -1;
+      const startFrac= k===0?0.1:k===1?0.7:0.4;
+      const rawX     = plat.x + (plat.w-type.w)*startFrac;
+      obstacles.push({
+        ...type,
+        x: Math.max(plat.x+2, Math.min(rawX, plat.x+plat.w-type.w-2)),
+        y: plat.y - type.h,
+        vx: type.spd * def.speed * dir,
+        platX:plat.x, platW:plat.w, platY:plat.y,
+        hitTimer:0,
+      });
+    }
+  });
+}
+
+// ── INPUT ────────────────────────────────────────────────────
+const keys={};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
 });
+document.addEventListener('keyup',e=>{ keys[e.code]=false; });
 
-document.addEventListener("keyup", e => {
-    keys[e.key] = false;
-    if (e.key === " ") {
-        stealing = false;
-        stealMeter = 0;
+// ── PHYSICS ──────────────────────────────────────────────────
+function rectOverlap(a,b){ return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y; }
+
+function applyGravity(obj){ obj.vy+=0.55; if(obj.vy>14)obj.vy=14; }
+
+function resolvePlatforms(){
+  player.onGround=false;
+  for(const p of platforms){
+    const prevBot=player.y+player.h-player.vy;
+    const curBot =player.y+player.h;
+    // Land on top surface
+    if(curBot>=p.y && prevBot<=p.y+5 &&
+       player.x+player.w>p.x+4 && player.x<p.x+p.w-4){
+      player.y=p.y-player.h;
+      player.vy=0;
+      player.onGround=true;
     }
-});
-
-function rectsTouch(a, b) {
-    return a.x < b.x + b.w &&
-           a.x + a.w > b.x &&
-           a.y < b.y + b.h &&
-           a.y + a.h > b.y;
+    // Hit ceiling (bottom of a platform)
+    if(player.y<p.y+p.h && player.y>p.y && player.vy<0 &&
+       player.x+player.w>p.x+4 && player.x<p.x+p.w-4){
+      player.y=p.y+p.h;
+      player.vy=0;
+    }
+  }
 }
 
-function near(x, y, w, h) {
-    return rectsTouch(player, {x, y, w, h});
+// ── FLOAT TEXT / PARTICLES ───────────────────────────────────
+function floatText(txt,x,y,color='#ff4444'){
+  const d=document.createElement('div');
+  d.className='floatText'; d.textContent=txt;
+  d.style.left=x+'px'; d.style.top=(y-10)+'px'; d.style.color=color;
+  floatTextsDiv.appendChild(d);
+  setTimeout(()=>d.remove(),1300);
+}
+function spawnParts(x,y,color,n=8){
+  for(let i=0;i<n;i++){
+    const a=(Math.PI*2*i/n)+Math.random()*0.5;
+    particles.push({x,y,vx:Math.cos(a)*3,vy:Math.sin(a)*3-2,life:30,maxLife:30,color,r:3+Math.random()*3});
+  }
 }
 
-function movePlayer() {
-    if (keys["ArrowUp"]) player.y -= player.speed;
-    if (keys["ArrowDown"]) player.y += player.speed;
-    if (keys["ArrowLeft"]) player.x -= player.speed;
-    if (keys["ArrowRight"]) player.x += player.speed;
+// ── UPDATE ───────────────────────────────────────────────────
+function update(){
+  if(state!=='playing') return;
 
-    player.x = Math.max(15, Math.min(canvas.width - player.w - 15, player.x));
-    player.y = Math.max(65, Math.min(canvas.height - player.h - 15, player.y));
-}
+  // -- Crouch --
+  const crouching=(keys['ArrowDown']||keys['KeyS'])&&player.onGround;
+  player.crouching=crouching;
+  player.h=crouching?16:28;
 
-function updateGame() {
-    if (gameOver) return;
-
-    movePlayer();
-
-    let noise = 0.03;
-
-    if (near(250, 140, 230, 135)) {
-        noise += 0.22;
-        msg.textContent = "Too close! Your roomie is mumbling in her sleep.";
-    }
-
-    if (near(130, 345, 70, 55)) {
-        noise += 0.5;
-        msg.textContent = "SQUEAK! You stepped on the dog toy.";
-    }
-
-    if (near(520, 390, 80, 55)) {
-        noise += 0.45;
-        msg.textContent = "CRUNCH! The chip bag is loud.";
-    }
-
-    if (near(cat.x, cat.y, cat.w, cat.h)) {
-        noise += 0.4;
-        msg.textContent = "The cat meowed. Betrayal.";
-    }
-
-    if (phoneBuzz && near(720, 370, 60, 40)) {
-        noise += 0.65;
-        msg.textContent = "The phone buzzed loudly!";
-    }
-
-    if (near(210, 160, 285, 150) || near(270, 360, 175, 75)) {
-        noise -= 0.08;
-    }
-
-    roomie.sleep -= noise;
-    roomie.sleep = Math.max(0, Math.min(100, roomie.sleep));
-
-    updateCat();
-    updatePhone();
-    stealCookie();
-
-    if (roomie.sleep <= 0) {
-        endGame("Your roomie woke up! You stole " + cookies + " cookies.");
-    }
-
-    if (cookies >= totalCookies) {
-        endGame("You stole all the cookies. Legendary snack thief.");
-    }
-}
-
-function stealCookie() {
-    let nearPlate = near(665, 235, 150, 100);
-
-    if (keys[" "] && nearPlate) {
-        stealing = true;
-        stealMeter += 1.4;
-        roomie.sleep -= 0.18;
-        msg.textContent = "Careful... stealing cookie...";
-
-        if (stealMeter >= 100) {
-            cookies++;
-            stealMeter = 0;
-            roomie.sleep -= 6;
-            msg.textContent = "Cookie stolen! The plate made a tiny clink.";
-        }
-    } else if (keys[" "] && !nearPlate) {
-        roomie.sleep -= 0.18;
-        msg.textContent = "You grabbed air. Suspicious.";
-    }
-}
-
-function calmRoomie() {
-    if (near(250, 140, 230, 135)) {
-        roomie.sleep += 12;
-        roomie.sleep = Math.min(100, roomie.sleep);
-        msg.textContent = "You whispered: 'Go back to sleep...' It worked.";
+  // -- Move --
+  const spd=player.slowTimer>0?1.6:3.1;
+  if(player.knockback>0){
+    player.knockback--;
+  } else {
+    if(!crouching){
+      if(keys['ArrowLeft']||keys['KeyA']){player.vx=-spd;player.facing=-1;}
+      else if(keys['ArrowRight']||keys['KeyD']){player.vx=spd;player.facing=1;}
+      else player.vx*=0.75;
     } else {
-        msg.textContent = "You need to be closer to your roomie to calm her.";
+      player.vx*=0.8;
     }
-}
-
-function updateCat() {
-    cat.x += cat.dx;
-    if (cat.x > 760 || cat.x < 590) cat.dx *= -1;
-}
-
-function updatePhone() {
-    phoneTimer++;
-
-    if (phoneTimer > 180) {
-        phoneBuzz = !phoneBuzz;
-        phoneTimer = 0;
+    if((keys['ArrowUp']||keys['KeyW']||keys['Space'])&&player.onGround&&!crouching){
+      player.vy=-11; player.onGround=false; sfxJump();
     }
-}
+  }
+  if(player.slowTimer>0) player.slowTimer--;
 
-function drawRoom() {
-    ctx.fillStyle = "#8b5e45";
-    ctx.fillRect(0, 60, 555, 500);
+  applyGravity(player);
+  player.x+=player.vx;
+  player.y+=player.vy;
 
-    ctx.fillStyle = "#73966d";
-    ctx.fillRect(555, 60, 395, 500);
+  if(player.x<0)player.x=0;
+  if(player.x+player.w>W)player.x=W-player.w;
+  if(player.y>H){
+    player.y=510;player.x=240;player.vy=0;player.vx=0;
+    hitPlayer(15,'CAÍSTE! -15');
+  }
 
-    ctx.fillStyle = "#3b2c25";
-    ctx.fillRect(548, 60, 10, 500);
+  resolvePlatforms();
 
-    ctx.fillStyle = "#c97b46";
-    ctx.fillRect(70, 80, 90, 75);
-    ctx.fillStyle = "#9bd7f0";
-    ctx.fillRect(82, 92, 66, 50);
+  // Walk anim
+  if(Math.abs(player.vx)>0.3&&!crouching){
+    player.walkTimer++;
+    if(player.walkTimer>8){player.walkFrame=(player.walkFrame+1)%4;player.walkTimer=0;}
+  } else player.walkFrame=0;
 
-    ctx.fillStyle = "#c97b46";
-    ctx.fillRect(790, 80, 90, 75);
-    ctx.fillStyle = "#9bd7f0";
-    ctx.fillRect(802, 92, 66, 50);
+  if(invincible>0) invincible--;
 
-    ctx.fillStyle = "#252525";
-    ctx.fillRect(40, 200, 125, 75);
-    ctx.fillStyle = "#90e0ef";
-    ctx.font = "14px Courier New";
-    ctx.fillText("TV: cooking show", 48, 242);
+  // -- Platform obstacles --
+  for(const o of obstacles){
+    o.x+=o.vx;
+    if(o.x<o.platX){o.x=o.platX;o.vx*=-1;}
+    if(o.x+o.w>o.platX+o.platW){o.x=o.platX+o.platW-o.w;o.vx*=-1;}
+    if(o.hitTimer>0)o.hitTimer--;
 
-    ctx.fillStyle = "#e76f51";
-    ctx.fillRect(230, 445, 270, 70);
-
-    ctx.fillStyle = "#9c6644";
-    ctx.fillRect(285, 370, 170, 75);
-
-    ctx.fillStyle = "#b5651d";
-    ctx.fillRect(690, 455, 220, 70);
-
-    ctx.fillStyle = "#d9f0ff";
-    ctx.fillRect(835, 220, 80, 140);
-
-    ctx.fillStyle = "#e9ecef";
-    ctx.beginPath();
-    ctx.ellipse(790, 490, 45, 25, 0, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-function drawSofaAndRoomie() {
-    ctx.fillStyle = "#4b1d95";
-    roundRect(210, 210, 285, 95, 18);
-
-    ctx.fillStyle = "#e85d04";
-    ctx.beginPath();
-    ctx.ellipse(355, 185, 75, 50, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#f2b6a0";
-    ctx.beginPath();
-    ctx.ellipse(355, 220, 65, 45, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#ffafcc";
-    roundRect(285, 242, 140, 48, 25);
-
-    ctx.fillStyle = "#111";
-    ctx.fillRect(330, 218, 10, 4);
-    ctx.fillRect(370, 218, 10, 4);
-
-    ctx.fillStyle = "#caf0f8";
-    ctx.font = "24px Courier New";
-    ctx.fillText("Zzz...", 440, 190);
-}
-
-function drawPlayer() {
-    ctx.fillStyle = "#2b1d0e";
-    ctx.beginPath();
-    ctx.arc(player.x + 17, player.y + 10, 18, Math.PI, 0);
-    ctx.fill();
-
-    ctx.fillStyle = "#f4c2a1";
-    ctx.beginPath();
-    ctx.arc(player.x + 17, player.y + 18, 16, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#00b4d8";
-    roundRect(player.x + 2, player.y + 34, 30, 36, 8);
-
-    ctx.fillStyle = "#111";
-    ctx.fillRect(player.x + 10, player.y + 17, 4, 4);
-    ctx.fillRect(player.x + 21, player.y + 17, 4, 4);
-}
-
-function drawKitchenItems() {
-    ctx.fillStyle = "#fff8e8";
-    ctx.beginPath();
-    ctx.ellipse(735, 275, 70, 38, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    for (let i = 0; i < Math.max(0, totalCookies - cookies); i++) {
-        ctx.fillStyle = "#c77d35";
-        ctx.beginPath();
-        ctx.arc(700 + (i % 4) * 22, 270 + Math.floor(i / 4) * 22, 13, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#5c3215";
-        ctx.fillRect(696 + (i % 4) * 22, 267 + Math.floor(i / 4) * 22, 4, 4);
+    if(invincible===0&&!o.hitTimer){
+      const pb={x:player.x,y:player.y,w:player.w,h:player.h};
+      if(rectOverlap(pb,o)){
+        hitPlayer(o.dmg,`-${o.dmg} ${o.name}`);
+        o.hitTimer=60;
+        player.knockback=14;player.vx=o.vx>0?4:-4;player.vy=-4;
+      }
     }
+  }
 
-    ctx.fillStyle = "#ffbe0b";
-    roundRect(520, 390, 80, 55, 5);
-    ctx.fillStyle = "#111";
-    ctx.font = "14px Courier New";
-    ctx.fillText("CHIPS", 537, 423);
-
-    ctx.fillStyle = "#ff006e";
-    roundRect(130, 345, 70, 55, 12);
-    ctx.fillStyle = "#111";
-    ctx.fillText("TOY", 150, 378);
-
-    ctx.fillStyle = phoneBuzz ? "#ff4d6d" : "#80ed99";
-    roundRect(720, 370, 60, 40, 5);
-    ctx.fillStyle = "#111";
-    ctx.fillText("PHONE", 727, 395);
-
-    ctx.fillStyle = "#f1faee";
-    ctx.beginPath();
-    ctx.ellipse(cat.x + 27, cat.y + 17, 35, 22, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#111";
-    ctx.fillText("cat", cat.x + 16, cat.y + 24);
-}
-
-function drawHUD() {
-    ctx.fillStyle = "#151527";
-    ctx.fillRect(0, 0, canvas.width, 60);
-
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "18px Courier New";
-    ctx.fillText("Cookies: " + cookies + "/" + totalCookies, 35, 36);
-    ctx.fillText("Roomie Sleep: " + Math.floor(roomie.sleep) + "%", 345, 36);
-    ctx.fillText("Time: " + time, 780, 36);
-
-    ctx.fillStyle = "#333";
-    ctx.fillRect(345, 43, 220, 10);
-
-    ctx.fillStyle = roomie.sleep > 50 ? "#80ed99" : roomie.sleep > 25 ? "#ffbe0b" : "#ff4d6d";
-    ctx.fillRect(345, 43, roomie.sleep * 2.2, 10);
-
-    if (stealing) {
-        ctx.fillStyle = "#111";
-        ctx.fillRect(650, 210, 180, 20);
-        ctx.fillStyle = "#ffd166";
-        ctx.fillRect(655, 215, stealMeter * 1.7, 10);
-        ctx.fillText("stealing...", 680, 200);
+  // -- Ramen (only near top platform area) --
+  const top=platforms[platforms.length-1];
+  const nearTop=player.y<top.y+120;
+  if(nearTop){
+    ramenTimer--;
+    if(ramenTimer<=0){
+      const rmx=roommate.x+15, rmy=roommate.y+10;
+      const dx=player.x-rmx, dy=player.y-rmy;
+      const dist=Math.sqrt(dx*dx+dy*dy)||1;
+      const spd2=3.5+level*0.4;
+      ramenProjectiles.push({
+        x:rmx,y:rmy,
+        vx:(dx/dist)*spd2,
+        vy:(dy/dist)*spd2-1,
+        w:20,h:8,life:180
+      });
+      roommate.throwAnim=25;
+      ramenTimer=Math.max(35, 90-level*10);
     }
+  } else {
+    ramenTimer=100;
+  }
+
+  // Roommate anim
+  roommate.frameTimer++;
+  if(roommate.frameTimer>20){roommate.frame=1-roommate.frame;roommate.frameTimer=0;}
+  roommate.bounceY=Math.sin(Date.now()/400)*2;
+  if(roommate.throwAnim>0)roommate.throwAnim--;
+
+  // -- Ramen projectiles --
+  for(let i=ramenProjectiles.length-1;i>=0;i--){
+    const r=ramenProjectiles[i];
+    r.x+=r.vx; r.y+=r.vy; r.vy+=0.12; r.life--;
+    if(r.life<=0){ramenProjectiles.splice(i,1);continue;}
+    // Crouching dodge: ramen passes over if player is ducking AND ramen y < player.y+8
+    const crouchDodge = player.crouching && r.y < player.y+4;
+    if(!crouchDodge && invincible===0){
+      const pb={x:player.x+2,y:player.y,w:player.w-4,h:player.h};
+      if(rectOverlap(r,pb)){
+        hitPlayer(18,'¡RAMEN! -18');
+        spawnParts(r.x,r.y,'#ffaa44',6);
+        ramenProjectiles.splice(i,1);
+      }
+    }
+  }
+
+  // -- Particles --
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;
+    if(p.life<=0)particles.splice(i,1);
+  }
+
+  // -- WIN: touch cookies --
+  if(rectOverlap({x:player.x,y:player.y,w:player.w,h:player.h},cookies)){
+    triggerCookieTouch();
+  }
+
+  if(Math.random()<0.008) score+=10;
 }
 
-function drawGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawRoom();
-    drawSofaAndRoomie();
-    drawKitchenItems();
+function hitPlayer(dmg,label){
+  energy-=dmg;
+  sfxHit();
+  floatText(label,player.x+canvas.offsetLeft,player.y+canvas.offsetTop);
+  spawnParts(player.x+player.w/2,player.y+player.h/2,'#ff4444');
+  invincible=90;
+  if(energy<=0){energy=0;state='gameover';sfxLose();showOverlay('gameover');}
+}
+
+function triggerCookieTouch(){
+  sfxWin();
+  score+=energy*10+level*500;
+  cookieTouchAnim=140;
+  state='cookieanim';
+  setTimeout(()=>{
+    if(level<LEVEL_DEFS.length-1){
+      level++;
+      energy=Math.min(energy+20,100);
+      initLevel();
+      state='playing';
+      sfxCoin();
+    } else {
+      state='win';
+      showOverlay('win');
+    }
+  },1500);
+}
+
+// ── DRAW ─────────────────────────────────────────────────────
+function px(n){return Math.round(n);}
+
+function drawPlayer(){
+  const x=px(player.x),y=px(player.y);
+  if(invincible>0&&Math.floor(invincible/6)%2===0)return;
+  ctx.save();
+  if(player.facing===-1){ctx.scale(-1,1);ctx.translate(-W,0);}
+  const rx=player.facing===-1?W-x-player.w:x;
+
+  if(player.crouching){
+    // Crouching sprite — squished, arms forward reaching for cookies
+    ctx.fillStyle='#3355aa';ctx.fillRect(rx+2,y+10,18,8);
+    ctx.fillStyle='#221100';ctx.fillRect(rx+2,y+16,8,4);ctx.fillRect(rx+12,y+16,8,4);
+    ctx.fillStyle='#cc4422';ctx.fillRect(rx+1,y+3,20,9);
+    ctx.fillStyle='#2244aa';ctx.fillRect(rx-3,y+1,7,9);
+    ctx.fillStyle='#cc4422';ctx.fillRect(rx+18,y+4,9,5); // arm reaching
+    ctx.fillStyle='#ffcc99';ctx.fillRect(rx+25,y+4,5,4); // hand
+    ctx.fillStyle='#ffcc99';ctx.fillRect(rx+3,y,16,6);
+    ctx.fillStyle='#442200';ctx.fillRect(rx+3,y-2,16,5);ctx.fillRect(rx+1,y,3,5);ctx.fillRect(rx+17,y,3,5);
+    ctx.fillStyle='#000';ctx.fillRect(rx+6,y+2,3,3);ctx.fillRect(rx+13,y+2,3,3);
+  } else {
+    const lw=player.walkFrame;
+    ctx.fillStyle='#3355aa';
+    ctx.fillRect(rx+4,y+20,6,8);ctx.fillRect(rx+12,y+20,6,8);
+    if(lw===1||lw===3){ctx.fillRect(rx+4,y+22,6,6);ctx.fillRect(rx+12,y+18,6,10);}
+    ctx.fillStyle='#221100';ctx.fillRect(rx+3,y+27,8,4);ctx.fillRect(rx+11,y+27,8,4);
+    ctx.fillStyle='#cc4422';ctx.fillRect(rx+2,y+10,18,12);
+    const arm=(lw===0||lw===2)?0:(lw===1?-2:2);
+    ctx.fillStyle='#cc4422';ctx.fillRect(rx-2,y+11+arm,5,8);ctx.fillRect(rx+19,y+11-arm,5,8);
+    ctx.fillStyle='#ffcc99';ctx.fillRect(rx-2,y+19+arm,5,4);ctx.fillRect(rx+19,y+19-arm,5,4);
+    ctx.fillStyle='#ffcc99';ctx.fillRect(rx+3,y+1,16,12);
+    ctx.fillStyle='#442200';ctx.fillRect(rx+3,y,16,5);ctx.fillRect(rx+1,y+2,4,8);ctx.fillRect(rx+17,y+2,4,8);
+    ctx.fillStyle='#000';ctx.fillRect(rx+6,y+5,3,3);ctx.fillRect(rx+13,y+5,3,3);
+    ctx.fillStyle='#cc5522';ctx.fillRect(rx+7,y+9,2,2);ctx.fillRect(rx+13,y+9,2,2);ctx.fillRect(rx+9,y+11,4,2);
+    ctx.fillStyle='#2244aa';ctx.fillRect(rx-4,y+8,7,10);
+  }
+  ctx.restore();
+}
+
+function drawRoommate(){
+  const rx=px(roommate.x),ry=px(roommate.y+roommate.bounceY);
+  const rw=roommate.w,rh=roommate.h,th=roommate.throwAnim>0;
+
+  ctx.fillStyle='#9944bb';ctx.fillRect(rx+2,ry+18,rw-4,rh-22);
+  ctx.fillStyle='#ee9966';ctx.fillRect(rx+2,ry+14,rw-4,6);
+  ctx.fillStyle='#ffcc99';
+  if(th){ctx.fillRect(rx-4,ry+10,5,7);ctx.fillRect(rx+rw-1,ry+8,5,7);
+         ctx.fillStyle='#ffbb88';ctx.fillRect(rx-4,ry+8,6,5);ctx.fillRect(rx+rw-1,ry+6,6,5);}
+  else  {ctx.fillRect(rx-2,ry+16,5,7);ctx.fillRect(rx+rw-3,ry+16,5,7);
+         ctx.fillStyle='#ffbb88';ctx.fillRect(rx-2,ry+22,6,5);ctx.fillRect(rx+rw-4,ry+22,6,5);}
+  ctx.fillStyle='#cc7744';ctx.fillRect(rx+4,ry+rh-10,8,10);ctx.fillRect(rx+rw-12,ry+rh-10,8,10);
+  ctx.fillStyle='#442200';ctx.fillRect(rx+3,ry+rh-4,10,4);ctx.fillRect(rx+rw-13,ry+rh-4,10,4);
+  ctx.fillStyle='#ffcc99';ctx.fillRect(rx+4,ry+1,rw-8,15);ctx.fillRect(rx+2,ry+3,rw-4,11);
+  ctx.fillStyle='rgba(255,100,80,0.4)';ctx.fillRect(rx+3,ry+9,5,4);ctx.fillRect(rx+rw-8,ry+9,5,4);
+  ctx.fillStyle='#ff6600';
+  ctx.fillRect(rx+2,ry-3,rw-4,7);ctx.fillRect(rx,ry-1,4,5);ctx.fillRect(rx+rw-4,ry-1,4,5);
+  ctx.fillRect(rx+5,ry-6,5,6);ctx.fillRect(rx+12,ry-7,5,7);ctx.fillRect(rx+19,ry-5,4,5);
+  ctx.fillStyle='#000';ctx.fillRect(rx+6,ry+6,4,4);ctx.fillRect(rx+rw-10,ry+6,4,4);
+  ctx.fillStyle='#882200';ctx.fillRect(rx+5,ry+4,6,2);ctx.fillRect(rx+rw-11,ry+4,6,2);
+  ctx.fillRect(rx+8,ry+11,8,2);
+  ctx.fillStyle='rgba(255,240,200,0.7)';ctx.fillRect(rx+6,ry+18,rw-12,12);
+  if(roommate.frame===0){ctx.fillStyle='#ff0000';ctx.fillRect(rx+rw+2,ry,6,12);ctx.fillRect(rx+rw+3,ry+14,4,4);}
+}
+
+function drawCookies(){
+  const cx=px(cookies.x),cy=px(cookies.y);
+  // Pulsing glow
+  const g=0.12+0.1*Math.sin(Date.now()/300);
+  ctx.fillStyle=`rgba(255,200,50,${g})`;ctx.fillRect(cx-6,cy-6,42,32);
+  // Tray
+  ctx.fillStyle='#aa5500';ctx.fillRect(cx,cy+14,30,4);
+  // Two cookies on tray
+  ctx.fillStyle='#cc6622';ctx.fillRect(cx+2,cy+2,12,12);ctx.fillRect(cx+16,cy+2,12,12);
+  ctx.fillStyle='#aa4400';
+  ctx.fillRect(cx+4,cy+4,4,4);ctx.fillRect(cx+9,cy+9,3,3); // choco chips 1
+  ctx.fillRect(cx+18,cy+4,4,4);ctx.fillRect(cx+23,cy+9,3,3); // choco chips 2
+  ctx.fillStyle='#ffaa44';ctx.fillRect(cx+2,cy+2,3,3);ctx.fillRect(cx+16,cy+2,3,3);
+  // Label above
+  ctx.fillStyle='#ffcc44';ctx.font='5px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText('🍪 ¡COOKIES!',cx+15,cy-4);
+}
+
+function drawRamen(r){
+  const x=px(r.x),y=px(r.y);
+  ctx.fillStyle='#ffffff';ctx.fillRect(x,y+3,r.w,r.h-3);
+  ctx.fillStyle='#dddddd';ctx.fillRect(x+2,y+5,r.w-4,r.h-7);
+  ctx.fillStyle='#ffcc88';ctx.fillRect(x+3,y,4,6);ctx.fillRect(x+9,y-2,3,7);ctx.fillRect(x+15,y+1,4,5);
+  ctx.fillStyle='#ff8822';ctx.fillRect(x+3,y+6,r.w-6,r.h-10);
+}
+
+function drawObstacle(o){
+  const x=px(o.x),y=px(o.y);
+  ctx.save();
+  if(o.hitTimer>50)ctx.globalAlpha=0.5;
+  ctx.fillStyle=o.color;
+  if(o.shape==='spatula'){
+    ctx.fillRect(x,y+3,o.w-6,4);ctx.fillRect(x+o.w-8,y,8,o.h);
+    ctx.fillStyle='#886633';ctx.fillRect(x,y+4,6,2);
+  } else if(o.shape==='whisk'){
+    ctx.fillRect(x+6,y,6,o.h-6);
+    ctx.strokeStyle=o.color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(x+9,y+o.h-6,7,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+4,y+o.h-10);ctx.lineTo(x+9,y+o.h-3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+14,y+o.h-10);ctx.lineTo(x+9,y+o.h-3);ctx.stroke();
+  } else if(o.shape==='rollingpin'){
+    ctx.fillStyle='#e8c080';ctx.fillRect(x+8,y+1,o.w-16,o.h-2);
+    ctx.fillStyle='#c8a060';ctx.fillRect(x,y+3,10,o.h-6);ctx.fillRect(x+o.w-10,y+3,10,o.h-6);
+    ctx.fillStyle='#fff8e0';ctx.fillRect(x+10,y+2,4,o.h-4);
+  } else if(o.shape==='pan'){
+    ctx.fillStyle='#555';ctx.fillRect(x+4,y+2,o.w-12,o.h-4);
+    ctx.fillStyle='#444';ctx.fillRect(x+o.w-8,y+o.h/2-2,10,4);
+    ctx.fillStyle='#333';ctx.fillRect(x,y+4,8,o.h-8);
+    ctx.fillStyle='#888';ctx.fillRect(x+6,y+o.h-4,o.w-14,3);
+  } else if(o.shape==='tray'){
+    ctx.fillStyle='#bb7744';ctx.fillRect(x,y+4,o.w,o.h-4);
+    ctx.fillStyle='#cc9955';
+    for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x+9+i*13,y+3,5,0,Math.PI*2);ctx.fill();}
+  } else if(o.shape==='flour'){
+    ctx.fillStyle='#e8e0c8';ctx.fillRect(x,y,o.w,o.h);
+    ctx.fillStyle='#d0c8b0';ctx.fillRect(x+2,y+2,o.w-4,2);ctx.fillRect(x+2,y+o.h-4,o.w-4,2);
+    ctx.fillStyle='#b0a888';ctx.fillRect(x+o.w/2-3,y,6,5);
+    ctx.fillStyle='#cc4422';ctx.fillRect(x+2,y+8,o.w-4,10);
+    ctx.fillStyle='#fff';ctx.font='4px "Press Start 2P",monospace';ctx.textAlign='center';
+    ctx.fillText('HARINA',x+o.w/2,y+15);
+  }
+  ctx.restore();
+}
+
+function drawPlatform(p){
+  ctx.fillStyle='#8B4513';ctx.fillRect(px(p.x),px(p.y),p.w,p.h);
+  ctx.fillStyle='#A0522D';ctx.fillRect(px(p.x),px(p.y),p.w,4);
+  ctx.fillStyle='#6B3410';
+  for(let gx=p.x;gx<p.x+p.w;gx+=12)ctx.fillRect(px(gx),px(p.y)+4,2,p.h-4);
+  ctx.fillStyle='#C0763A';ctx.fillRect(px(p.x),px(p.y),p.w,2);
+  ctx.fillStyle='#555';
+  if(p.w>60){ctx.fillRect(px(p.x)+8,px(p.y)+p.h,6,8);ctx.fillRect(px(p.x+p.w)-14,px(p.y)+p.h,6,8);}
+}
+
+function drawBackground(){
+  ctx.fillStyle='#2a1500';ctx.fillRect(0,0,W,H);
+  for(let gy=0;gy<H;gy+=40){
+    for(let gx=0;gx<W;gx+=40){
+      ctx.fillStyle=((gx/40+gy/40)%2===0)?'#2e1800':'#281400';
+      ctx.fillRect(gx,gy,40,40);
+      ctx.strokeStyle='#3a2000';ctx.lineWidth=0.5;ctx.strokeRect(gx,gy,40,40);
+    }
+  }
+  // Flour bags decoration (bottom only, no side jar)
+  ctx.fillStyle='#e8e0c8';ctx.fillRect(10,490,30,55);
+  ctx.fillStyle='#cc4422';ctx.fillRect(12,504,26,14);
+  ctx.fillStyle='#fff';ctx.font='4px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText('FLOUR',25,513);
+
+  // Oven bottom-right
+  ctx.fillStyle='#444';ctx.fillRect(410,480,80,80);
+  ctx.fillStyle='#222';ctx.fillRect(420,490,60,40);
+  ctx.fillStyle='#ff6600';ctx.fillRect(425,495,50,30);
+  ctx.fillStyle='rgba(255,100,0,0.4)';
+  for(let fi=0;fi<3;fi++)ctx.fillRect(430+fi*14,498,8,24);
+  ctx.fillStyle='#555';ctx.fillRect(415,535,70,10);
+
+  // Mixing bowl left
+  ctx.fillStyle='#ddd';ctx.fillRect(20,440,35,22);
+  ctx.fillStyle='#ccc';ctx.fillRect(16,432,43,11);
+  ctx.fillStyle='#e8c080';ctx.fillRect(22,441,31,8);
+
+  // Stars
+  ctx.fillStyle='#ffdd88';
+  for(const s of bgStars){
+    ctx.globalAlpha=0.3+0.3*Math.sin(Date.now()/800+s.b*10);
+    ctx.fillRect(px(s.x),px(s.y),px(s.r),px(s.r));
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawHUD(){
+  // Energy bar
+  ctx.fillStyle='#000';ctx.fillRect(8,8,154,16);
+  ctx.fillStyle=energy>50?'#44dd44':energy>25?'#dddd44':'#dd4444';
+  ctx.fillRect(10,10,Math.max(0,energy/100*150),12);
+  ctx.strokeStyle='#ffcc44';ctx.lineWidth=2;ctx.strokeRect(8,8,154,16);
+  ctx.fillStyle='#ffdd88';ctx.font='6px "Press Start 2P",monospace';ctx.textAlign='left';
+  ctx.fillText(`ENERGÍA: ${Math.round(energy)}`,12,20);
+
+  ctx.fillStyle='#ffcc44';ctx.font='8px "Press Start 2P",monospace';ctx.textAlign='right';
+  ctx.fillText(`SCORE: ${score}`,W-10,20);
+
+  ctx.textAlign='center';ctx.fillStyle='#ff8844';ctx.font='7px "Press Start 2P",monospace';
+  ctx.fillText(`NIVEL ${level+1}`,W/2,20);
+
+  ctx.fillStyle='#88ff88';ctx.font='5px "Press Start 2P",monospace';ctx.textAlign='left';
+  ctx.fillText('↓ crouch = dodge ramen',10,38);
+
+  if(player&&player.crouching){
+    ctx.fillStyle='#ffff44';ctx.font='7px "Press Start 2P",monospace';ctx.textAlign='center';
+    ctx.fillText('CROUCHING!',W/2,38);
+  }
+
+  // Draw a jump-here arrow pointing at the gap between penúltima and top
+  // Only show when player is on or near the penúltima platform
+  if(platforms.length>=2){
+    const penult = platforms[platforms.length-2];
+    const top    = platforms[platforms.length-1];
+    const onPenult = player && player.onGround &&
+                     Math.abs(player.y+player.h - penult.y) < 5 &&
+                     player.x+player.w > penult.x && player.x < penult.x+penult.w;
+    if(onPenult){
+      // Find the gap: either to the left or right of penúltima relative to top
+      // Gap is whichever side of penúltima is NOT overlapping with top
+      const penultRight = penult.x + penult.w;
+      const topLeft     = top.x;
+      // If penúltima is on the left, gap is to the right of penúltima
+      // If penúltima is on the right, gap is to the left
+      let arrowX;
+      if(penult.x < top.x){ // penúltima left, gap on right → jump rightward
+        arrowX = (penultRight + top.x + top.w) / 2;
+        if(arrowX > W-20) arrowX = top.x + 40;
+      } else { // penúltima right, gap on left
+        arrowX = (top.x + penult.x) / 2;
+        if(arrowX < 20) arrowX = top.x + top.w - 40;
+      }
+      const arrowY = penult.y - 20;
+      // Blinking arrow
+      if(Math.floor(Date.now()/400)%2===0){
+        ctx.fillStyle='#ffff00';
+        ctx.font='10px "Press Start 2P",monospace';
+        ctx.textAlign='center';
+        ctx.fillText('↑ SALTA',arrowX, arrowY);
+      }
+    }
+  }
+}
+
+function drawCookieTouchAnim(){
+  const t=cookieTouchAnim; if(t<=0)return;
+  ctx.save();
+  ctx.globalAlpha=Math.min(1,(140-t)/20);
+  ctx.fillStyle='rgba(255,220,50,0.2)';ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=1;
+  const cx=cookies.x+15,cy=cookies.y+10;
+  for(let i=0;i<8;i++){
+    const a=Math.PI*2*i/8;
+    const d=(140-t)*0.9;
+    const sx=cx+Math.cos(a)*d,sy=cy+Math.sin(a)*d;
+    ctx.fillStyle='#ffdd44';ctx.fillRect(px(sx)-4,px(sy)-4,8,8);
+    ctx.fillStyle='#fff';ctx.fillRect(px(sx)-2,px(sy)-2,4,4);
+  }
+  ctx.fillStyle='#ffdd00';ctx.font='18px "Press Start 2P",monospace';ctx.textAlign='center';
+  ctx.fillText('¡COOKIES!',W/2,H/2-20);
+  ctx.fillStyle='#ff8800';ctx.font='9px "Press Start 2P",monospace';
+  ctx.fillText('THE COOKIES ARE YOURS!',W/2,H/2+10);
+  ctx.restore();
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function render(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  if(state==='playing'||state==='cookieanim'){
+    for(const p of platforms)drawPlatform(p);
+    drawCookies();
+    drawRoommate();
+    for(const o of obstacles)drawObstacle(o);
+    for(const r of ramenProjectiles)drawRamen(r);
+    for(const p of particles){
+      ctx.globalAlpha=p.life/p.maxLife;
+      ctx.fillStyle=p.color;
+      ctx.fillRect(px(p.x-p.r/2),px(p.y-p.r/2),px(p.r),px(p.r));
+    }
+    ctx.globalAlpha=1;
     drawPlayer();
+    if(state==='cookieanim')drawCookieTouchAnim();
     drawHUD();
-
-    if (gameOver) {
-        ctx.fillStyle = "rgba(0,0,0,0.65)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#ffd166";
-        ctx.font = "34px Courier New";
-        ctx.fillText("GAME OVER", 365, 260);
-    }
+  }
 }
 
-function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
-    ctx.fill();
+// ── GAME LOOP ────────────────────────────────────────────────
+function tick(){update();render();requestAnimationFrame(tick);}
+
+// ── OVERLAYS ─────────────────────────────────────────────────
+function showOverlay(type){
+  overlay.style.display='flex';
+  instructBtn.style.display=type==='title'?'block':'none';
+  const h1=overlay.querySelector('h1');
+  if(type==='title'){
+    h1.innerHTML='COOKIE SIEGE<br>THE ROOMMATE BATTLE';
+    overlaySubtitle.innerHTML='Your roommate baked cookies.<br>You want them. She will NOT share.';
+    overlayBody.innerHTML='Climb the kitchen mountain and TOUCH THE COOKIES!<br><br>← → / A D — Move &nbsp; ↑ / W / Space — Jump<br>↓ / S — Crouch (dodge the ramen!)<br><br>When you reach the top: CROUCH to dodge ramen,<br>then TOUCH the cookies to WIN!<br><br><span style="color:#ff8844;font-size:6px">Based on a true story.</span>';
+    overlayBtn.textContent='START GAME';
+} else if(type==='win'){
+    h1.innerHTML='🍪 YOU WIN! 🍪<br>THE COOKIES ARE YOURS!';
+    overlaySubtitle.innerHTML=`Score: ${score}<br><br>You stole the cookies<br>from your roommate!`;
+    overlayBody.innerHTML='The sweet smell of victory... and cookies!';
+    overlayBtn.textContent='PLAY AGAIN';
+
+  } else if(type==='gameover'){
+    h1.innerHTML='GAME OVER!<br>THE KITCHEN CHAOS<br>DEFEATED YOU!';
+    overlaySubtitle.innerHTML=`Score: ${score}<br>Level ${level+1}`;
+    overlayBody.innerHTML='The obstacles drained your energy!<br>Remember: ↓ to crouch and dodge ramen!';
+    overlayBtn.textContent='TRY AGAIN';
+  } else if(type==='instructions'){
+    h1.innerHTML='HOW TO PLAY';
+    overlaySubtitle.innerHTML='CONTROLS';
+    overlayBody.innerHTML=`
+      ← → or A D — Move &nbsp; ↑ or W or SPACE — Jump<br>↓ or S — Crouch<br><br>
+      PLATFORM OBSTACLES:<br>
+      Spatula:-10 | Whisk:-15 | Rolling Pin:-20<br>
+      Frying Pan:-25 | Cookie Tray:-12 | Flour:-10<br><br>
+      At the top your roommate throws RAMEN.<br>
+      CROUCH (↓/S) to dodge it!<br>
+      Reach the cookies and TOUCH them to win.<br><br>
+      Falling = -15 energy &nbsp; Energy=0 → GAME OVER`;
+    overlayBtn.textContent='GOT IT!';
+  }
 }
 
-function endGame(text) {
-    gameOver = true;
-    msg.textContent = text;
+overlayBtn.addEventListener('click',()=>{
+  if (AC && AC.state === 'suspended') {
+    AC.resume();
 }
+  const s=state;
+  overlay.style.display='none';
+  if(s==='title'||s==='gameover'||s==='win'){
+    level=0;score=0;energy=100;
+    initLevel();state='playing';
+  } else if(s==='instructions'){
+    state='title';showOverlay('title');
+  }
+});
+instructBtn.addEventListener('click',()=>{state='instructions';showOverlay('instructions');});
 
-function restartGame() {
-    player.x = 70;
-    player.y = 455;
-    roomie.sleep = 100;
-    cookies = 0;
-    time = 70;
-    gameOver = false;
-    stealMeter = 0;
-    stealing = false;
-    msg.textContent = "Steal cookies from the kitchen without waking your roomie.";
-}
-
-setInterval(() => {
-    if (!gameOver) {
-        time--;
-        if (time <= 0) {
-            endGame("Time is up! You stole " + cookies + " cookies.");
-        }
-    }
-}, 1000);
-
-function loop() {
-    updateGame();
-    drawGame();
-    requestAnimationFrame(loop);
-}
-
-loop();
+// ── START ────────────────────────────────────────────────────
+state='title';
+showOverlay('title');
+tick();
 </script>
 
 </body>
